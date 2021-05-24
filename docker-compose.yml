@@ -1,0 +1,16 @@
+version: '3.4'
+
+services:
+  php:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    volumes:
+      - ./:/app
+
+  coverage:
+    image: m3ng9i/ran
+    volumes:
+      - ./coverage:/web:ro
+    ports:
+      - 8080:8080
