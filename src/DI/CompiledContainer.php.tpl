@@ -17,12 +17,12 @@ const FACTORY_REFS = <?php var_export($factory_refs); ?>;
 
     <?php endforeach ?>
 
-    public function has($id)
+    public function has(string $id): bool
     {
         return isset(static::FACTORY_REFS[$id]) || parent::has($id);
     }
 
-    public function make(string $id) {
+    protected function make(string $id) {
         $method = static::FACTORY_REFS[$id] ?? null;
         return $method ? $this->$method() : parent::make($id);
     }

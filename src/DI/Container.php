@@ -147,7 +147,7 @@ class Container implements ContainerInterface, LoggerAwareInterface
     }
 
     // ----- USAGE -----
-    private function make(string $id)
+    protected function make(string $id)
     {
         if (isset($this->isResolving[$id])) {
             throw new CircularDependencyException([...array_keys($this->isResolving), $id]);
