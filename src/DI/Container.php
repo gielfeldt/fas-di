@@ -143,7 +143,7 @@ class Container implements ContainerInterface, LoggerAwareInterface
 
     public function compiler(): Compiler
     {
-        return new Compiler($this->definitions, $this->isLazy);
+        return new Compiler($this->definitions, $this->isLazy, $this);
     }
 
     // ----- USAGE -----

@@ -4,10 +4,12 @@ namespace Fas\DI\Tests;
 
 class TestImplementation implements TestInterface
 {
+    public static $counter = 0;
     private $id;
 
     public function __construct($id = 'default')
     {
+        self::$counter++;
         $this->id = $id;
     }
 

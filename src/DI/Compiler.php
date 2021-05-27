@@ -2,16 +2,13 @@
 
 namespace Fas\DI;
 
-use Closure;
 use Fas\DI\Exception\CircularDependencyException;
 use Fas\DI\Exception\InvalidDefinitionException;
 use InvalidArgumentException;
-use Opis\Closure\ReflectionClosure;
+use Psr\Container\ContainerInterface;
 use Psr\Log\LoggerAwareInterface;
 use Psr\Log\LoggerAwareTrait;
-use ReflectionClass;
-use ReflectionFunctionAbstract;
-use ReflectionMethod;
+
 use Throwable;
 
 class Compiler implements LoggerAwareInterface
@@ -20,18 +17,16 @@ class Compiler implements LoggerAwareInterface
 
     private array $definitions;
     private array $isLazy;
-    private bool $deepResolve = true;
+    private ContainerInterface $container;
+    private Autowire $autowire;
 
-    public function __construct(array $definitions, array $isLazy)
+    public $baseClass = '\\' . Container::class;
+
+    public function __construct(array $definitions, array $isLazy, $container)
     {
         $this->definitions = $definitions;
         $this->isLazy = $isLazy;
-    }
-
-    public function deepResolve(bool $deepResolve = true)
-    {
-        $this->deepResolve = $deepResolve;
-        return $this;
+        $this->autowire = new Autowire($container);
     }
 
     public function compile(string $filename)
@@ -61,9 +56,6 @@ class Compiler implements LoggerAwareInterface
                     }
                 }
             }
-            if (!$this->deepResolve) {
-                break;
-            }
         }
         $factories = [];
         $factory_refs = [];
@@ -78,6 +70,7 @@ class Compiler implements LoggerAwareInterface
 
         $code = "<?php\n";
         $className = 'CompiledContainer' . uniqid();
+        $baseClass = $this->baseClass;
         ob_start();
         include __DIR__ . '/CompiledContainer.php.tpl';
         $code .= ob_get_contents();
@@ -103,20 +96,14 @@ class Compiler implements LoggerAwareInterface
             }
             $definition = $this->definitions[$id] ?? $id;
             if ($id === $definition) {
-                return $this->compileNew($definition); // Class
+                return $this->autowire->compileNew($definition, null, $this->mayNeedResolving); // Class
             }
             if (is_string($definition)) {
                 $this->mayNeedResolving[$definition] = true;
-                return '$this->get(' . var_export($definition, true) . ')'; // Reference
+                return '$container->get(' . var_export($definition, true) . ')'; // Reference
             }
             if (is_callable($definition)) {
                 return $this->compileFactory($definition); // Factory
-            }
-            if ($definition === true) {
-                if ($this->logger) {
-                    $this->logger->warning("Skipping compile of value definition for '$id'");
-                }
-                return null;
             }
             throw new InvalidDefinitionException($id, $definition);
         } finally {
@@ -124,76 +111,9 @@ class Compiler implements LoggerAwareInterface
         }
     }
 
-    private function nameFromFunction(ReflectionFunctionAbstract $r)
-    {
-        $functionName = $r->getName();
-        $className = $r->getClosureScopeClass();
-        $className = $className ? $className->getName() : null;
-        $functionName = $className ? "$className::$functionName" : $functionName;
-        return $functionName;
-    }
-
-    private function compileArguments(ReflectionFunctionAbstract $r, $id)
-    {
-        $args = [];
-        $ps = $r->getParameters();
-        foreach ($ps as $p) {
-            $name = $p->getName();
-            $type = $p->hasType() ? $p->getType()->getName() : null;
-            if (isset($type) && (isset($this->definitions[$type]) || class_exists($type))) {
-                $this->mayNeedResolving[$type] = true;
-                $args[] = '$this->get(' . var_export($type, true) . ')';
-                continue;
-            }
-            if (!$p->isOptional() && class_exists($type)) {
-                $args[] = '$this->get(' . var_export($type, true) . ')';
-                continue;
-            }
-            if (!$p->isDefaultValueAvailable()) {
-                $functionName = $this->nameFromFunction($r);
-                throw new InvalidArgumentException("[$id] Argument: $functionName($type \$$name) has no default value while resolving");
-            } elseif ($p->isPassedByReference()) {
-                $functionName = $this->nameFromFunction($r);
-                throw new InvalidArgumentException("[$id] Argument: $functionName($type \$$name) cannot autowire by reference parameters");
-            } else {
-                $args[] = var_export($p->getDefaultValue(), true);
-            }
-        }
-        return $args;
-    }
-
-    private function compileNew(string $className)
-    {
-        if (!class_exists($className)) {
-            throw new InvalidArgumentException("Class or service '$className' not found");
-        }
-        // No definition, assume class
-        $c = new ReflectionClass($className);
-        $r = $c->getConstructor();
-        $args = $r ? $this->compileArguments($r, $className) : [];
-        return "new \\" . $c->getName() . '(' . implode(',', $args) . ')';
-    }
-
     private function compileFactory(callable $definition)
     {
-        if (is_array($definition) && is_string($definition[0])) {
-            [$class, $method] = $definition;
-            $reflection = new ReflectionMethod($class, $method);
-            $args = $this->compileArguments($reflection, $class);
-            if (!$reflection->isStatic()) {
-                $this->mayNeedResolving[$class] = true;
-                return '$this->get(' . var_export($class, true) . ")->$method(" . implode(',', $args) . ')';
-            } else {
-                return "\\$class::$method(" . implode(',', $args) . ')';
-            }
-        }
-
-        $id = (is_array($definition) && is_object($definition[0])) ? get_class($definition[0]) . '->' . $definition[1] : 'anonymous';
-
-        $c = Closure::fromCallable($definition);
-        $rf = new ReflectionClosure($c);
-        $args = $this->compileArguments($rf, $id);
-        return '(' . $rf->getCode() . ')(' . implode(',', $args) . ')';
+        return '(' . $this->autowire->compileCall($definition, null, $this->mayNeedResolving) . ')([], $this)';
     }
 
     private function compileLazy(string $id)
@@ -201,11 +121,11 @@ class Compiler implements LoggerAwareInterface
         $definition = $this->definitions[$id];
         if ($definition === $id) {
             // Proxy self
-            $factory = $this->compileNew($definition);
+            $factory = $this->autowire->compileNew($definition, null, $this->mayNeedResolving);
         } elseif (is_string($definition)) {
             // Proxy container entry
             $this->mayNeedResolving[$definition] = true;
-            $factory = '$this->get(' . var_export($definition, true) . ')';
+            $factory = '$container->get(' . var_export($definition, true) . ')';
         } elseif (is_callable($definition)) {
             // Proxy factory
             $factory = $this->compileFactory($definition);
@@ -213,6 +133,7 @@ class Compiler implements LoggerAwareInterface
             throw new InvalidArgumentException("Cannot compile proxy for '$id'");
         }
         $proxyMethod = 'function (& $wrappedObject, $proxy, $method, $parameters, & $initializer) {
+            $container = $this;
             $wrappedObject = ' . $factory . ';
             $initializer   = null;
         }';

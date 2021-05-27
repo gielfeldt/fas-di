@@ -1,7 +1,8 @@
 
 namespace Fas\DI;
 
-class <?php print $className; ?> extends Container
+class <?php print $className; ?> extends <?php print $baseClass; ?>
+
 {
 const FACTORY_REFS = <?php var_export($factory_refs); ?>;
 
@@ -11,6 +12,7 @@ const FACTORY_REFS = <?php var_export($factory_refs); ?>;
 
     function <?php print $method; ?>()
     {
+        $container = $this;
         <?php print $callback; ?>
 
     }
