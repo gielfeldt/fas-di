@@ -1,8 +1,8 @@
 #!/bin/bash
 
-composer install
-
 while true; do
+
+    composer update
 
     find /app/src/ -type f -name '*.php' -exec php -l {} \; | (! grep -v "No syntax errors detected" )
     vendor/bin/phpcs --standard=psr12 src
