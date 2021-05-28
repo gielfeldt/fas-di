@@ -8,7 +8,6 @@ use InvalidArgumentException;
 use Psr\Container\ContainerInterface;
 use Psr\Log\LoggerAwareInterface;
 use Psr\Log\LoggerAwareTrait;
-
 use Throwable;
 
 class Compiler implements LoggerAwareInterface
