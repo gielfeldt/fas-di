@@ -1,4 +1,18 @@
- 
+![Build Status](https://github.com/gielfeldt/fas-di/actions/workflows/php.yml/badge.svg)
+![Test Coverage](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/gielfeldt/0a1cf78da65d9c91d05e6a5ef1ec0808/raw/fas-di__main.json)
+
+![Latest Stable Version](https://poser.pugx.org/fas/di/v/stable.svg)
+![Latest Unstable Version](https://poser.pugx.org/fas/di/v/unstable.svg)
+![License](https://poser.pugx.org/fas/di/license.svg)
+![Total Downloads](https://poser.pugx.org/fas/di/downloads.svg)
+
+
+# Installation
+
+```bash
+composer require fas/di
+```
+
 
 # Usage
 
@@ -215,6 +229,10 @@ $result = $autowire->call($myfunction, ['name' => 'autowire with named parameter
 
 // => HELLO: AUTOWIRE WITH NAMED PARAMETER
 print "$result\n";
+
+$code = $autowire->compileCall($myfunction);
+
+
 ```
 
 
