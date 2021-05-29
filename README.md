@@ -1,9 +1,9 @@
-![Build Status](https://github.com/gielfeldt/fas-di/actions/workflows/test.yml/badge.svg)
+[![Build Status](https://github.com/gielfeldt/fas-di/actions/workflows/test.yml/badge.svg)][4]
 ![Test Coverage](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/gielfeldt/0a1cf78da65d9c91d05e6a5ef1ec0808/raw/fas-di__main.json)
 
-![Latest Stable Version](https://poser.pugx.org/fas/di/v/stable.svg)
-![Latest Unstable Version](https://poser.pugx.org/fas/di/v/unstable.svg)
-![License](https://poser.pugx.org/fas/di/license.svg)
+[![Latest Stable Version](https://poser.pugx.org/fas/di/v/stable.svg)][1]
+[![Latest Unstable Version](https://poser.pugx.org/fas/di/v/unstable.svg)][2]
+[![License](https://poser.pugx.org/fas/di/license.svg)][3]
 ![Total Downloads](https://poser.pugx.org/fas/di/downloads.svg)
 
 
@@ -261,3 +261,8 @@ $result = $autowire->call($myfunction, ['name' => 'autowire with named parameter
 // => HELLO: AUTOWIRE WITH NAMED PARAMETER
 print "$result\n";
 ```
+
+[1]:  https://packagist.org/packages/fas/di
+[2]:  https://packagist.org/packages/fas/di#dev-main
+[3]:  https://github.com/gielfeldt/fas-di/blob/main/LICENSE.md
+[4]:  https://github.com/gielfeldt/fas-di/actions/workflows/test.yml
