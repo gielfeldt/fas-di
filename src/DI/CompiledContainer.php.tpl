@@ -1,4 +1,6 @@
 
+declare(strict_types=1);
+
 namespace Fas\DI;
 
 class <?php print $className; ?> extends <?php print $baseClass; ?>

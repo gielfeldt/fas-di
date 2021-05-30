@@ -16,11 +16,11 @@
         }
     ],
     "provide": {
-        "psr/container-implementation": "^2.0"
+        "psr/container-implementation": "^1.0"
     },
     "require": {
         "php": ">=7.4.0",
-        "psr/container": "^2.0",
+        "psr/container": "^1.0 || ^2.0",
         "psr/log": "^1.1",
         "opis/closure": "^3.6",
         "ocramius/proxy-manager": "^2.11"
