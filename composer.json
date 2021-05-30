@@ -15,6 +15,9 @@
             "email": "thomas@gielfeldt.dk"
         }
     ],
+    "provide": {
+        "psr/container-implementation": "^2.0"
+    },
     "require": {
         "php": ">=7.4.0",
         "psr/container": "^2.0",
