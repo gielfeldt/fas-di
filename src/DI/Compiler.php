@@ -163,7 +163,7 @@ class Compiler implements LoggerAwareInterface
             $reflection = new ReflectionMethod($class, $method);
             $args = $this->compileArguments($reflection, $defaultArgs, $mayNeedResolving);
             if ($reflection->isStatic()) {
-                return $class . '::' . $method . '(' . implode(', ', $args) . ')';
+                return '\\' . $class . '::' . $method . '(' . implode(', ', $args) . ')';
             } elseif (!$this->container) {
                 return '(' . $this->compileNew($class, null, $mayNeedResolving) . ')->' . $method . '(' . implode(', ', $args) . ')';
             } else {
