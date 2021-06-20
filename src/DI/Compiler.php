@@ -40,27 +40,20 @@ class Compiler implements LoggerAwareInterface
     public function compile(string $filename)
     {
         $this->isCompiling = [];
-        $this->mayNeedResolving = [];
 
         $resolved = [];
 
-        $this->mayNeedResolving = $this->definitions;
-
         $built = [];
-        while (!empty($this->mayNeedResolving)) {
-            $mayNeedResolving = array_keys($this->mayNeedResolving);
-            $this->mayNeedResolving = [];
-            foreach ($mayNeedResolving as $id) {
-                if (!isset($resolved[$id])) {
-                    $resolved[$id] = true;
-                    try {
-                        if ($compiled = $this->compileEntry($id)) {
-                            $built[$id] = $compiled;
-                        }
-                    } catch (Throwable $e) {
-                        if ($this->logger) {
-                            $this->logger->error($e->getMessage());
-                        }
+        foreach (array_keys($this->definitions) as $id) {
+            if (!isset($resolved[$id])) {
+                $resolved[$id] = true;
+                try {
+                    if ($compiled = $this->compileEntry($id)) {
+                        $built[$id] = $compiled;
+                    }
+                } catch (Throwable $e) {
+                    if ($this->logger) {
+                        $this->logger->error($e->getMessage());
                     }
                 }
             }
@@ -102,10 +95,9 @@ class Compiler implements LoggerAwareInterface
             }
             $definition = $this->definitions[$id] ?? $id;
             if ($id === $definition) {
-                return $this->compileNew($definition, null, $this->mayNeedResolving); // Class
+                return $this->compileNew($definition, null); // Class
             }
             if (is_string($definition)) {
-                $this->mayNeedResolving[$definition] = true;
                 return '$this->get(' . var_export($definition, true) . ')'; // Reference
             }
             if (is_callable($definition)) {
@@ -119,7 +111,7 @@ class Compiler implements LoggerAwareInterface
 
     private function compileFactory(callable $definition)
     {
-        return $this->compileCall($definition, null, $this->mayNeedResolving);
+        return $this->compileCall($definition, null);
     }
 
     private function compileLazy(string $id)
@@ -127,10 +119,9 @@ class Compiler implements LoggerAwareInterface
         $definition = $this->definitions[$id];
         if ($definition === $id) {
             // Proxy self
-            $factory = $this->compileNew($definition, null, $this->mayNeedResolving);
+            $factory = $this->compileNew($definition, null);
         } elseif (is_string($definition)) {
             // Proxy container entry
-            $this->mayNeedResolving[$definition] = true;
             $factory = '$this->get(' . var_export($definition, true) . ')';
         } elseif (is_callable($definition)) {
             // Proxy factory
@@ -147,7 +138,7 @@ class Compiler implements LoggerAwareInterface
     }
 
     // COMPILE
-    public function compileCall($callback, ?array $defaultArgs = [], array &$mayNeedResolving = [])
+    public function compileCall($callback, ?array $defaultArgs = [])
     {
         $reflection = null;
         if (is_array($callback)) {
@@ -161,11 +152,11 @@ class Compiler implements LoggerAwareInterface
             }
 
             $reflection = new ReflectionMethod($class, $method);
-            $args = $this->compileArguments($reflection, $defaultArgs, $mayNeedResolving);
+            $args = $this->compileArguments($reflection, $defaultArgs);
             if ($reflection->isStatic()) {
                 return '\\' . $class . '::' . $method . '(' . implode(', ', $args) . ')';
             } elseif (!$this->container) {
-                return '(' . $this->compileNew($class, null, $mayNeedResolving) . ')->' . $method . '(' . implode(', ', $args) . ')';
+                return '(' . $this->compileNew($class, null) . ')->' . $method . '(' . implode(', ', $args) . ')';
             } else {
                 return '($this->get(' . var_export($class, true) . '))->' . $method . '(' . implode(', ', $args) . ')';
             }
@@ -177,21 +168,21 @@ class Compiler implements LoggerAwareInterface
                 throw new InvalidDefinitionException($callback, $callback);
             }
             $reflection = new ReflectionMethod($instance, '__invoke');
-            $args = $this->compileArguments($reflection, $defaultArgs, $mayNeedResolving);
-            return '(' . $this->compileNew(get_class($instance), $defaultArgs, $mayNeedResolving) . ')(' . implode(', ', $args) . ')';
+            $args = $this->compileArguments($reflection, $defaultArgs);
+            return '(' . $this->compileNew(get_class($instance), $defaultArgs) . ')(' . implode(', ', $args) . ')';
         } elseif (is_string($callback) && $this->container && $this->container->has($callback)) {
             $instance = $this->container->get($callback);
             if (!is_callable($instance)) {
                 throw new InvalidDefinitionException($callback, $callback);
             }
             $reflection = new ReflectionMethod($instance, '__invoke');
-            $args = $this->compileArguments($reflection, $defaultArgs, $mayNeedResolving);
+            $args = $this->compileArguments($reflection, $defaultArgs);
             return '($this->get(' . var_export($callback, true) . '))(' . implode(', ', $args) . ')';
         }
 
         $closure = Closure::fromCallable($callback);
         $reflection = new ReflectionFunction($closure);
-        $args = $this->compileArguments($reflection, $defaultArgs, $mayNeedResolving);
+        $args = $this->compileArguments($reflection, $defaultArgs);
         $rf = new ReflectionClosure($closure);
         $staticVariables = [];
         foreach ($rf->getStaticVariables() as $key => $value) {
@@ -215,7 +206,7 @@ class Compiler implements LoggerAwareInterface
         }
     }
 
-    public function compileNew(string $className, ?array $defaultArgs = null, array &$mayNeedResolving = [])
+    public function compileNew(string $className, ?array $defaultArgs = null)
     {
         if (!class_exists($className)) {
             throw new NotFoundException($className);
@@ -227,14 +218,14 @@ class Compiler implements LoggerAwareInterface
             $this->resolving[$className] = true;
             $c = new ReflectionClass($className);
             $r = $c->getConstructor();
-            $args = $r ? $this->compileArguments($r, $defaultArgs, $mayNeedResolving) : [];
+            $args = $r ? $this->compileArguments($r, $defaultArgs) : [];
             return "new \\" . $c->getName() . '(' . implode(', ', $args) . ')';
         } finally {
             unset($this->resolving[$className]);
         }
     }
 
-    private function compileArguments(ReflectionFunctionAbstract $r, ?array $defaultArgs = null, array &$mayNeedResolving = [])
+    private function compileArguments(ReflectionFunctionAbstract $r, ?array $defaultArgs = null)
     {
         $args = [];
         $ps = $r->getParameters();
@@ -255,11 +246,10 @@ class Compiler implements LoggerAwareInterface
                 continue;
             }
             if (isset($type) && !$this->container && class_exists($type)) {
-                $args[$name] = $pparg . $this->compileNew($type, $defaultArgs, $mayNeedResolving);
+                $args[$name] = $pparg . $this->compileNew($type, $defaultArgs);
                 continue;
             }
             if (isset($type) && $this->container && $this->container->has($type)) {
-                $mayNeedResolving[$type] = true;
                 $args[$name] = $pparg . '$this->get(' . var_export($type, true) . ')';
                 continue;
             }

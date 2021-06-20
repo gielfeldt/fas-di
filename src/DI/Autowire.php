@@ -126,7 +126,7 @@ class Autowire implements ContainerInterface
     }
 
     // COMPILE
-    public function compileCall($callback, ?array $defaultArgs = [], array &$mayNeedResolving = [])
+    public function compileCall($callback, ?array $defaultArgs = [])
     {
         $reflection = null;
         if (is_array($callback)) {
@@ -140,7 +140,7 @@ class Autowire implements ContainerInterface
             }
 
             $reflection = new ReflectionMethod($class, $method);
-            $args = $this->compileArguments($reflection, $defaultArgs, $mayNeedResolving);
+            $args = $this->compileArguments($reflection, $defaultArgs);
             if ($reflection->isStatic()) {
                 return '
     static function ($args = [], ?\\' . ContainerInterface::class . ' $container = null) {
@@ -149,7 +149,7 @@ class Autowire implements ContainerInterface
             } elseif ($this->container === $this) {
                 return '
     static function ($args = [], ?\\' . ContainerInterface::class . ' $container = null) {
-        $instance = ' . $this->compileNew($class, null, $mayNeedResolving) . ';
+        $instance = ' . $this->compileNew($class, null) . ';
         return $instance->' . $method . '(' . implode(', ', $args) . ');
     }';
             } else {
@@ -167,10 +167,10 @@ class Autowire implements ContainerInterface
                 throw new InvalidDefinitionException($callback, $callback);
             }
             $reflection = new ReflectionMethod($instance, '__invoke');
-            $args = $this->compileArguments($reflection, $defaultArgs, $mayNeedResolving);
+            $args = $this->compileArguments($reflection, $defaultArgs);
             return '
 static function ($args = [], ?\\' . ContainerInterface::class . ' $container = null) {
-    $instance = ' . $this->compileNew(get_class($instance), $defaultArgs, $mayNeedResolving) . ';
+    $instance = ' . $this->compileNew(get_class($instance), $defaultArgs) . ';
     return $instance(' . implode(', ', $args) . ');
 }';
         } elseif (is_string($callback) && $this->container->has($callback)) {
@@ -179,7 +179,7 @@ static function ($args = [], ?\\' . ContainerInterface::class . ' $container = n
                 throw new InvalidDefinitionException($callback, $callback);
             }
             $reflection = new ReflectionMethod($instance, '__invoke');
-            $args = $this->compileArguments($reflection, $defaultArgs, $mayNeedResolving);
+            $args = $this->compileArguments($reflection, $defaultArgs);
             return '
 static function ($args = [], ?\\' . ContainerInterface::class . ' $container = null) {
     $instance = $container->get(' . var_export($callback, true) . ');
@@ -189,7 +189,7 @@ static function ($args = [], ?\\' . ContainerInterface::class . ' $container = n
 
         $closure = Closure::fromCallable($callback);
         $reflection = new ReflectionFunction($closure);
-        $args = $this->compileArguments($reflection, $defaultArgs, $mayNeedResolving);
+        $args = $this->compileArguments($reflection, $defaultArgs);
         $rf = new ReflectionClosure($closure);
         $staticVariables = [];
         foreach ($rf->getStaticVariables() as $key => $value) {
@@ -203,7 +203,7 @@ static function ($args = [], ?\\' . ContainerInterface::class . ' $container = n
 }';
     }
 
-    public function compileNew(string $className, ?array $defaultArgs = null, array &$mayNeedResolving = [])
+    public function compileNew(string $className, ?array $defaultArgs = null)
     {
         if (!class_exists($className)) {
             throw new NotFoundException($className);
@@ -215,14 +215,14 @@ static function ($args = [], ?\\' . ContainerInterface::class . ' $container = n
             $this->resolving[$className] = true;
             $c = new ReflectionClass($className);
             $r = $c->getConstructor();
-            $args = $r ? $this->compileArguments($r, $defaultArgs, $mayNeedResolving) : [];
+            $args = $r ? $this->compileArguments($r, $defaultArgs) : [];
             return "new \\" . $c->getName() . '(' . implode(', ', $args) . ')';
         } finally {
             unset($this->resolving[$className]);
         }
     }
 
-    private function compileArguments(ReflectionFunctionAbstract $r, ?array $defaultArgs = null, array &$mayNeedResolving = [])
+    private function compileArguments(ReflectionFunctionAbstract $r, ?array $defaultArgs = null)
     {
         $args = [];
         $ps = $r->getParameters();
@@ -243,11 +243,10 @@ static function ($args = [], ?\\' . ContainerInterface::class . ' $container = n
                 continue;
             }
             if (isset($type) && $this->container === $this && $this->container->has($type)) {
-                $args[$name] = $pparg . $this->compileNew($type, $defaultArgs, $mayNeedResolving);
+                $args[$name] = $pparg . $this->compileNew($type, $defaultArgs);
                 continue;
             }
             if (isset($type) && $this->container->has($type)) {
-                $mayNeedResolving[$type] = true;
                 $args[$name] = $pparg . '$container->get(' . var_export($type, true) . ')';
                 continue;
             }
