@@ -7,10 +7,10 @@ class TestImplementation implements TestInterface
     public static $counter = 0;
     private $id;
 
-    public function __construct($id = 'default')
+    public function __construct($id = null)
     {
         self::$counter++;
-        $this->id = $id;
+        $this->id = $id ?? uniqid();
     }
 
     public function id()
