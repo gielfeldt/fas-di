@@ -47,6 +47,18 @@ $container->singleton(LoggerInterface::class, function () {
 $container->singleton(LoggerInterface::class, [MyLoggerFactory::class, 'create']);
 ```
 
+Abstract factories. Will be resolved on every ->get()
+
+API is identical to ->singleton()
+
+```php
+// ->factory(entryName, entryName | callback | null)
+$container->factory(MyLogger::class);
+
+$logger1 = $container->get(MyLogger::class); // will create new object
+$logger2 = $container->get(MyLogger::class); // will create new object
+```
+
 Lazy. Will not be resolved before used. (virtual proxy)
 
 API is identical to ->singleton(), except you can omit 2nd parameter in order to turn any entry/class lazy
@@ -62,15 +74,9 @@ $container->lazy(MyLogger::class); // Lazy shorthand
 // Use cached virtual proxies (lazy), and write cache if missing
 $container->enableProxyCache('/tmp/proxies');
 
-// Use cached virtual proxies (lazy) if present, but don't write them
-$container->useProxyCache('/tmp/proxies');
-
-// Build cache for all virual proxies.
-$container->buildProxyCache('/tmp/proxies');
-
 // Generate a class containing proper methods for registered entries.
 // This can be used afterwards to avoid a lot of reflection when resolving entries.
-$container->compile('/tmp/container.php');
+$container->save('/tmp/container.php');
 ```
 
 # Recipies
@@ -86,7 +92,7 @@ $container = Container::load("/tmp/container.php");
 if (!$container) {
     $container = new Container;
     $container->singleton(LoggerInterface::class, MyLogger::class);
-    $container->compile('/tmp/container.php');
+    $container->save('/tmp/container.php');
 }
 $container->enableProxyCache("/tmp/proxies");
 
@@ -118,11 +124,7 @@ $container = new Container;
 
 // ... populate container here
 
-$proxies = $container->buildProxyCache("/tmp/proxies");
-$entries = $container->compile("/tmp/container.php");
-
-print "-----------------\nBuilt " . count($proxies) . " proxies\n-----------------\n";
-print implode("\n", $proxies) . "\n\n";
+$entries = $container->save("/tmp/container.php");
 
 print "-----------------\nCompiled " . count($entries) . " entries\n-----------------\n";
 print implode("\n", $entries) . "\n\n";
@@ -192,74 +194,12 @@ FileCache::save('/tmp/config.cache.php', $configuration);
 
 // Compile container
 $container = ContainerFactory::create($configuration);
-$proxies = $container->buildProxyCache('/tmp/proxy.cache');
-print "-----------------\nBuilt " . count($proxies) . " proxies\n-----------------\n" . implode("\n", $proxies) . "\n-----------------\n";
 $entries = $container->save('/tmp/container.cache.php');
 print "-----------------\nBuilt " . count($entries) . " entries\n-----------------\n" . implode("\n", $entries) . "\n-----------------\n";
 
 // Compile routes
 $router = RouterFactory::create($container);
 $router->save('/tmp/router.cache.php');
-```
-
-# Autowiring
-
-The container uses the included Autowire class for performing autowiring.
-
-This functionality can be used without the container (or with another container) if desired.
-
-## Without container
-
-Without a container, only concrete classes can be autowired, and only if they
-have concrete dependences in their constructor.
-
-```php
-<?php
-
-use App\MyClass;
-use Fas\DI\Autowire;
-
-$autowire = new Autowire;
-
-$myfunction = static function (MyClass $myclass, $name = 'test') {
-    return $myclass->someMethodThatUppercasesAString("Hello: $name");
-};
-
-$result = $autowire->call($myfunction, ['name' => 'autowire with named parameter']);
-
-// => HELLO: AUTOWIRE WITH NAMED PARAMETER
-print "$result\n";
-
-$code = $autowire->compileCall($myfunction);
-
-
-```
-
-
-## With container
-
-With a container, the container will be used for resolving function arguments.
-
-```php
-<?php
-
-use App\MyClass;
-use App\MyClassInterface;
-use Fas\DI\Autowire;
-use Fas\DI\Container;
-
-$container = new Container;
-$container->singleton(MyClassInterface::class, MyClass::class);
-$autowire = new Autowire($container);
-
-$myfunction = static function (MyClassInterface $myclass, $name = 'test') {
-    return $myclass->someMethodThatUppercasesAString("Hello: $name");
-};
-
-$result = $autowire->call($myfunction, ['name' => 'autowire with named parameter']);
-
-// => HELLO: AUTOWIRE WITH NAMED PARAMETER
-print "$result\n";
 ```
 
 [1]:  https://packagist.org/packages/fas/di
