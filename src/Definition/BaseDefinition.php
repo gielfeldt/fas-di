@@ -3,7 +3,7 @@
 namespace Fas\DI\Definition;
 
 use Fas\Autowire\Autowire;
-use Fas\Autowire\CompiledClosure;
+use Fas\Autowire\CompiledCode;
 use Fas\DI\ProxyFactoryInterface;
 
 class BaseDefinition implements DefinitionInterface
@@ -65,7 +65,7 @@ class BaseDefinition implements DefinitionInterface
         return $definition->isCompilable();
     }
 
-    public function compile(Autowire $autowire): CompiledClosure
+    public function compile(Autowire $autowire): CompiledCode
     {
         $definition = $this->resolved ?? $this->resolved = $this->resolve();
         return $definition->compile($autowire);

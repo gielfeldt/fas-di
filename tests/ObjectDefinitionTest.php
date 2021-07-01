@@ -3,7 +3,7 @@
 namespace Fas\DI\Tests;
 
 use Fas\Autowire\Autowire;
-use Fas\Autowire\CompiledClosure;
+use Fas\Autowire\CompiledCode;
 use Fas\Autowire\Exception\NotFoundException;
 use Fas\DI\Definition\ObjectDefinition;
 use Fas\DI\Tests\TestImplementation;
@@ -30,8 +30,7 @@ class ObjectDefinitionTest extends TestCase
         $def = new ObjectDefinition(TestImplementation::class);
 
         $autowire = new Autowire();
-        $closure = $def->compile($autowire);
-        $this->assertTrue($closure instanceof CompiledClosure);
-        $this->assertIsCallable($closure);
+        $code = $def->compile($autowire);
+        $this->assertTrue($code instanceof CompiledCode);
     }
 }

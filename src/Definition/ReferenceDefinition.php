@@ -3,7 +3,7 @@
 namespace Fas\DI\Definition;
 
 use Fas\Autowire\Autowire;
-use Fas\Autowire\CompiledClosure;
+use Fas\Autowire\CompiledCode;
 
 class ReferenceDefinition implements DefinitionInterface
 {
@@ -24,9 +24,9 @@ class ReferenceDefinition implements DefinitionInterface
         return true;
     }
 
-    public function compile(Autowire $autowire): CompiledClosure
+    public function compile(Autowire $autowire): CompiledCode
     {
         $autowire->trackReference($this->reference);
-        return new CompiledClosure('$this->get(' . var_export($this->reference, true) . ')');
+        return new CompiledCode('$this->get(' . var_export($this->reference, true) . ')');
     }
 }

@@ -3,7 +3,7 @@
 namespace Fas\DI\Definition;
 
 use Fas\Autowire\Autowire;
-use Fas\Autowire\CompiledClosure;
+use Fas\Autowire\CompiledCode;
 use Fas\Autowire\Exception\NotFoundException;
 
 class ObjectDefinition implements DefinitionInterface
@@ -28,9 +28,9 @@ class ObjectDefinition implements DefinitionInterface
         return true;
     }
 
-    public function compile(Autowire $autowire): CompiledClosure
+    public function compile(Autowire $autowire): CompiledCode
     {
         $code = $autowire->compileNew($this->className);
-        return new CompiledClosure('(' . $code . ')($this)');
+        return new CompiledCode('(' . $code . ')($this)');
     }
 }

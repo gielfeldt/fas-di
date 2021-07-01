@@ -4,7 +4,7 @@ namespace Fas\DI\Definition;
 
 use BadMethodCallException;
 use Fas\Autowire\Autowire;
-use Fas\Autowire\CompiledClosure;
+use Fas\Autowire\CompiledCode;
 
 class ValueDefinition implements DefinitionInterface
 {
@@ -25,7 +25,7 @@ class ValueDefinition implements DefinitionInterface
         return false;
     }
 
-    public function compile(Autowire $autowire): CompiledClosure
+    public function compile(Autowire $autowire): CompiledCode
     {
         throw new BadMethodCallException("Cannot compile value");
     }

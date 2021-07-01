@@ -3,7 +3,7 @@
 namespace Fas\DI\Definition;
 
 use Fas\Autowire\Autowire;
-use Fas\Autowire\CompiledClosure;
+use Fas\Autowire\CompiledCode;
 
 class FactoryDefinition implements DefinitionInterface
 {
@@ -24,9 +24,9 @@ class FactoryDefinition implements DefinitionInterface
         return true;
     }
 
-    public function compile(Autowire $autowire): CompiledClosure
+    public function compile(Autowire $autowire): CompiledCode
     {
         $code = $autowire->compileCall($this->factory);
-        return new CompiledClosure('(' . $code . ')($this)');
+        return new CompiledCode('(' . $code . ')($this)');
     }
 }

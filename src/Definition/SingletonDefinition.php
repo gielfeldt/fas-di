@@ -3,7 +3,7 @@
 namespace Fas\DI\Definition;
 
 use Fas\Autowire\Autowire;
-use Fas\Autowire\CompiledClosure;
+use Fas\Autowire\CompiledCode;
 
 class SingletonDefinition implements DefinitionInterface
 {
@@ -28,8 +28,8 @@ class SingletonDefinition implements DefinitionInterface
         return $this->definition->isCompilable();
     }
 
-    public function compile(Autowire $autowire): CompiledClosure
+    public function compile(Autowire $autowire): CompiledCode
     {
-        return new CompiledClosure('$this->resolved[' . var_export($this->id, true) . '] = ' . $this->definition->compile($autowire));
+        return new CompiledCode('$this->resolved[' . var_export($this->id, true) . '] = ' . $this->definition->compile($autowire));
     }
 }

@@ -3,7 +3,7 @@
 namespace Fas\DI\Definition;
 
 use Fas\Autowire\Autowire;
-use Fas\Autowire\CompiledClosure;
+use Fas\Autowire\CompiledCode;
 use Fas\DI\ProxyFactoryInterface;
 
 class LazyDefinition implements DefinitionInterface
@@ -35,7 +35,7 @@ class LazyDefinition implements DefinitionInterface
         return $this->definition->isCompilable();
     }
 
-    public function compile(Autowire $autowire): CompiledClosure
+    public function compile(Autowire $autowire): CompiledCode
     {
         $factory = $this->definition->compile($autowire);
 
@@ -46,6 +46,6 @@ class LazyDefinition implements DefinitionInterface
 
         // Warning: assumes compiled container implements ProxyFactoryInterface
         $code = '$this->createProxy(' . var_export($this->className, true) . ', ' . $initializer . ')';
-        return new CompiledClosure($code);
+        return new CompiledCode($code);
     }
 }

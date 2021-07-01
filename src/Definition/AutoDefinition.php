@@ -3,7 +3,7 @@
 namespace Fas\DI\Definition;
 
 use Fas\Autowire\Autowire;
-use Fas\Autowire\CompiledClosure;
+use Fas\Autowire\CompiledCode;
 use Fas\Autowire\Exception\InvalidDefinitionException;
 
 class AutoDefinition implements DefinitionInterface
@@ -35,7 +35,7 @@ class AutoDefinition implements DefinitionInterface
         return $this->definition->isCompilable();
     }
 
-    public function compile(Autowire $autowire): CompiledClosure
+    public function compile(Autowire $autowire): CompiledCode
     {
         return $this->definition->compile($autowire);
     }
