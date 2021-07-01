@@ -2,12 +2,28 @@
 
 namespace Fas\DI\Tests;
 
+use Fas\Autowire\Exception\InvalidDefinitionException;
 use Fas\DI\Container;
 use Fas\DI\Tests\TestImplementation;
 use PHPUnit\Framework\TestCase;
+use Psr\Log\LoggerInterface;
+use Psr\Log\NullLogger;
 
-class ContainerTest extends TestCase
+class CompiledContainerTest extends TestCase
 {
+
+    public function testIsCompiledFlag()
+    {
+        $container = new Container();
+
+        $filename = tempnam(sys_get_temp_dir(), 'fas-di-test');
+        $container->save($filename);
+        $container = Container::load($filename);
+        unlink($filename);
+
+        $this->assertTrue($container->isCompiled());
+    }
+
     public function testCanCreateLazyProxy()
     {
         $container = new Container();
@@ -16,6 +32,11 @@ class ContainerTest extends TestCase
 
         $container->lazy(TestImplementation::class);
 
+        $filename = tempnam(sys_get_temp_dir(), 'fas-di-test');
+        $container->save($filename);
+        $container = Container::load($filename);
+        unlink($filename);
+
         $test = $container->get(TestImplementation::class);
 
         $this->assertEquals(0, TestImplementation::$counter);
@@ -23,7 +44,6 @@ class ContainerTest extends TestCase
         $this->assertEquals("ABC", $test->implementation('abc'));
 
         $this->assertEquals(1, TestImplementation::$counter);
-
     }
 
     public function testCanCreateLazyProxyMapping()
@@ -34,6 +54,11 @@ class ContainerTest extends TestCase
 
         $container->lazy(TestInterface::class, TestImplementation::class);
 
+        $filename = tempnam(sys_get_temp_dir(), 'fas-di-test');
+        $container->save($filename);
+        $container = Container::load($filename);
+        unlink($filename);
+
         $test = $container->get(TestInterface::class);
 
         $this->assertEquals(0, TestImplementation::$counter);
@@ -41,7 +66,6 @@ class ContainerTest extends TestCase
         $this->assertEquals("ABC", $test->implementation('abc'));
 
         $this->assertEquals(1, TestImplementation::$counter);
-
     }
 
     public function testCanCreateLazyProxyFactory()
@@ -54,6 +78,11 @@ class ContainerTest extends TestCase
             return new TestImplementation();
         });
 
+        $filename = tempnam(sys_get_temp_dir(), 'fas-di-test');
+        $container->save($filename);
+        $container = Container::load($filename);
+        unlink($filename);
+
         $test = $container->get(TestInterface::class);
 
         $this->assertEquals(0, TestImplementation::$counter);
@@ -61,7 +90,6 @@ class ContainerTest extends TestCase
         $this->assertEquals("ABC", $test->implementation('abc'));
 
         $this->assertEquals(1, TestImplementation::$counter);
-
     }
 
     public function testCanCreateSingleton()
@@ -72,6 +100,11 @@ class ContainerTest extends TestCase
 
         $container->singleton(TestImplementation::class);
 
+        $filename = tempnam(sys_get_temp_dir(), 'fas-di-test');
+        $container->save($filename);
+        $container = Container::load($filename);
+        unlink($filename);
+
         $test = $container->get(TestImplementation::class);
 
         $this->assertEquals(1, TestImplementation::$counter);
@@ -79,7 +112,6 @@ class ContainerTest extends TestCase
         $this->assertEquals("ABC", $test->implementation('abc'));
 
         $this->assertEquals(1, TestImplementation::$counter);
-
     }
 
     public function testCanCreateSingletonMapping()
@@ -89,6 +121,15 @@ class ContainerTest extends TestCase
         TestImplementation::$counter = 0;
 
         $container->singleton(TestInterface::class, TestImplementation::class);
+        $container->singleton(Circular1::class);
+        $container->singleton(TestImplementation::class, function () {
+            return new TestImplementation();
+        });
+
+        $filename = tempnam(sys_get_temp_dir(), 'fas-di-test');
+        $container->save($filename);
+        $container = Container::load($filename);
+        unlink($filename);
 
         $test = $container->get(TestInterface::class);
 
@@ -97,7 +138,6 @@ class ContainerTest extends TestCase
         $this->assertEquals("ABC", $test->implementation('abc'));
 
         $this->assertEquals(1, TestImplementation::$counter);
-
     }
 
     public function testCanCreateSingletonFactory()
@@ -110,6 +150,11 @@ class ContainerTest extends TestCase
             return new TestImplementation();
         });
 
+        $filename = tempnam(sys_get_temp_dir(), 'fas-di-test');
+        $container->save($filename);
+        $container = Container::load($filename);
+        unlink($filename);
+
         $test = $container->get(TestInterface::class);
 
         $this->assertEquals(1, TestImplementation::$counter);
@@ -117,7 +162,44 @@ class ContainerTest extends TestCase
         $this->assertEquals("ABC", $test->implementation('abc'));
 
         $this->assertEquals(1, TestImplementation::$counter);
+    }
 
+    public function testCanDetectInvalidDefinition()
+    {
+        $this->expectException(InvalidDefinitionException::class);
+
+        $container = new Container();
+        $container->singleton('invaliddefinition', 1234);
+
+
+        $filename = tempnam(sys_get_temp_dir(), 'fas-di-test');
+        $container->save($filename);
+        unlink($filename);
+    }
+
+    public function testCanDetectInvalidLazyDefinition()
+    {
+        $this->expectException(InvalidDefinitionException::class);
+
+        $container = new Container();
+        $container->lazy('invaliddefinition', 1234);
+
+        $filename = tempnam(sys_get_temp_dir(), 'fas-di-test');
+        $container->save($filename);
+        unlink($filename);
+    }
+
+    public function testReferenceTracking()
+    {
+        $container = new Container();
+        $container->singleton('test', TestImplementationDep::class);
+
+        $filename = tempnam(sys_get_temp_dir(), 'fas-di-test');
+        $container->save($filename);
+        $container = Container::load($filename);
+        unlink($filename);
+
+        $this->assertArrayHasKey(TestImplementation::class, $container::FACTORY_REFS);
     }
 
 }

@@ -6,7 +6,8 @@ namespace Fas\DI;
 class <?php print $className; ?> extends <?php print $baseClass; ?>
 
 {
-const FACTORY_REFS = <?php var_export($factory_refs); ?>;
+
+    const FACTORY_REFS = <?php var_export($factory_refs); ?>;
 
     <?php foreach ($factory_refs as $id => $method): ?>
     <?php $callback = $factories[$method]; ?>
@@ -14,7 +15,6 @@ const FACTORY_REFS = <?php var_export($factory_refs); ?>;
 
     function <?php print $method; ?>()
     {
-        $container = $this;
         <?php print $callback; ?>
 
     }
@@ -28,15 +28,23 @@ const FACTORY_REFS = <?php var_export($factory_refs); ?>;
 
     protected function make(string $id) {
         $method = static::FACTORY_REFS[$id] ?? null;
-        return $method ? $this->$method() : parent::make($id);
+        if ($method) {
+            try {
+                $this->markResolving($id);
+                return $this->$method();
+            } finally {
+                $this->unmarkResolving($id);
+            }
+        }
+        return parent::make($id);
     }
 
-    public function compile(string $filename = null)
+    public function save(string $filename = null)
     {
         throw new \BadMethodCallException("Cannot compile an already compiled container");
     }
 
-    public function isCompiled()
+    public function isCompiled(): bool
     {
         return true;
     }
