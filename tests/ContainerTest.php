@@ -174,6 +174,7 @@ class ContainerTest extends TestCase
         $this->assertEquals(0, TestImplementation::$counter);
         $this->assertEquals("ABC", $test->implementation('abc'));
         $this->assertEquals(1, TestImplementation::$counter);
+        var_dump(`ls -la /tmp/`);
         $found = count(glob('/tmp/ProxyManagerGeneratedProxy__PM__FasDITestsTestInterfaceGenerated*.php')) > 0;
         $this->assertTrue($found);
     }
