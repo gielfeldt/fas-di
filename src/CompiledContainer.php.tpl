@@ -39,7 +39,7 @@ class <?php print $className; ?> extends <?php print $baseClass; ?>
         return parent::make($id);
     }
 
-    public function save(string $filename = null)
+    public function save(string $filename)
     {
         throw new \BadMethodCallException("Cannot compile an already compiled container");
     }
