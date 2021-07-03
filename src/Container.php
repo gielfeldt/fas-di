@@ -6,146 +6,82 @@ namespace Fas\DI;
 
 use Closure;
 use Fas\Autowire\Autowire;
-use Fas\DI\Definition\AutoDefinition;
-use Fas\DI\Definition\BaseDefinition;
-use Fas\DI\Definition\DefinitionInterface;
-use Fas\DI\Definition\ObjectDefinition;
-use Fas\DI\Definition\SingletonDefinition;
-use Fas\DI\Definition\ValueDefinition;
+use Fas\Autowire\CompiledClosure;
 use Fas\Autowire\Exception\CircularDependencyException;
+use Fas\Autowire\Exception\InvalidDefinitionException;
 use Fas\Autowire\ReferenceTrackerInterface;
-use ProxyManager;
 use Psr\Container\ContainerInterface;
+use ProxyManager;
 
-/**
- * Simple container with proxies and compilation.
- */
-class Container implements ContainerInterface, ReferenceTrackerInterface, ProxyFactoryInterface
+class Container implements ContainerInterface, ReferenceTrackerInterface
 {
     protected array $definitions = [];
+    protected array $resolving = [];
     protected array $resolved = [];
-    protected array $isResolving = [];
-    protected $proxyFactory = null;
-    protected $autoloader = null;
+    protected array $factories = [];
+    protected array $lazies = [];
     protected Autowire $autowire;
+    protected array $references = [];
+    protected $proxyFactory = null;
+    public int $maxLevel = 10;
 
-    public function __construct()
+    public function __construct(?Autowire $autowire = null)
     {
-        $this->resolved[Container::class] = $this;
+        $this->autowire = $autowire ?? new Autowire($this);
         $this->resolved[ContainerInterface::class] = $this;
-        $this->definitions[ContainerInterface::class] = $this->definitions[Container::class] = new ValueDefinition($this);
-        $this->autowire = new Autowire($this);
-        $this->autowire->setReferenceTracker($this);
     }
 
-    // ----- PSR -----
-    /**
-     * @inheritdoc
-     */
     public function has(string $id): bool
     {
-        return isset($this->definitions[$id]) || class_exists($id);
+        return isset($this->definitions[$id]) || $this->autowire->canAutowire($id);
     }
 
-    /**
-     * @inheritdoc
-     */
     public function get(string $id)
     {
-        return $this->resolved[$id] ?? $this->make($id);
+        return $this->resolved[$id] ?? (
+            isset($this->factories[$id]) ? $this->make($id) : $this->resolved[$id] = $this->make($id)
+        );
     }
 
-    // ----- Building -----
-    public function set(string $id, DefinitionInterface $definition)
+    public function set(string $id, $definition = null)
     {
-        return $this->definitions[$id] = new BaseDefinition($id, $definition, $this->resolved, $this);
-    }
-
-    public function auto(string $id, $definition = null)
-    {
-        return $this->set($id, new AutoDefinition($id, $definition ?? $id));
+        $this->definitions[$id] = $definition ?? $id;
+        return new Definition($id, $this->lazies, $this->factories);
     }
 
     public function singleton(string $id, $definition = null)
     {
-        return $this->auto($id, $definition)->singleton();
+        return $this->set($id, $definition);
     }
 
     public function lazy(string $id, $definition = null)
     {
-        return $this->auto($id, $definition)->lazy();
+        return $this->set($id, $definition)->lazy();
     }
 
     public function factory(string $id, $definition = null)
     {
-        return $this->auto($id, $definition)->factory();
+        return $this->set($id, $definition)->factory();
     }
 
-    /**
-     * Load a compiled container
-     */
-    public static function load(string $filename): ?Container
-    {
-        $container = @include $filename;
-        return $container instanceof Container ? $container : null;
-    }
-
-    public function save(string $filename)
-    {
-        $built = [];
-        $this->references = [];
-
-        foreach ($this->definitions as $id => $definition) {
-            if ($definition->isCompilable()) {
-                $built[$id] = $definition->compile($this->autowire);
-            }
-        }
-
-        $references = $this->references;
-        while ($references) {
-            $this->references = [];
-            foreach ($references as $id) {
-                if (isset($built[$id])) {
-                    continue;
-                }
-                $built[$id] = (new SingletonDefinition($id, new ObjectDefinition($id), $this->resolved))->compile($this->autowire);
-            }
-            $references = $this->references;
-        }
-
-        $factories = [];
-        $factory_refs = [];
-        $definitions = [];
-        $ref = 1;
-        foreach ($built as $id => $callback) {
-            $factory_refs[$id] = "make_$ref";
-            $factories["make_$ref"] = "return $callback;";
-            $definitions[$id] = true;
-            $ref++;
-        }
-
-        $code = "<?php\n";
-        $className = 'CompiledContainer' . uniqid();
-        #$baseClass = $this->baseClass;
-        $baseClass = '\\' . self::class;
-        //$isLazy = $this->isLazy;
-        ob_start();
-        include __DIR__ . '/CompiledContainer.php.tpl';
-        $code .= ob_get_contents();
-        ob_end_clean();
-
-        $tmpfilename = tempnam(dirname($filename), 'container');
-        @chmod($tmpfilename, 0666);
-        file_put_contents($tmpfilename, $code);
-        @chmod($tmpfilename, 0666);
-        rename($tmpfilename, $filename);
-        @chmod($filename, 0666);
-        return array_keys($built);
-    }
-
-    public function isCompiled(): bool
+    public function isCompiled()
     {
         return false;
+    }
+
+    public function getAutowire()
+    {
+        return $this->autowire;
+    }
+
+    public function new(string $className, array $args = [])
+    {
+        return $this->autowire->new($className, $args);
+    }
+
+    public function call($callback, array $args = [])
+    {
+        return $this->autowire->call($callback, $args);
     }
 
     public function enableProxyCache(string $proxyCacheDirectory)
@@ -166,40 +102,49 @@ class Container implements ContainerInterface, ReferenceTrackerInterface, ProxyF
 
     protected function make(string $id)
     {
-        $definition = $this->definitions[$id] ?? new BaseDefinition($id, new ObjectDefinition($id), $this->resolved, $this);
+        $this->mark($id);
         try {
-            $this->markResolving($id);
-            return $definition->make($this->autowire);
+            $definition = $this->definitions[$id] ?? $id;
+            if ($id === $definition) {
+                $constructor = function ($definition) {
+                    return $this->autowire->new($definition);
+                };
+            } elseif (is_string($definition)) {
+                $constructor = function ($definition) {
+                    return $this->get($definition);
+                };
+            } elseif (is_callable($definition)) {
+                $constructor = function ($definition) {
+                    return $this->autowire->call($definition);
+                };
+            } else {
+                throw new InvalidDefinitionException($id, var_export($definition, true));
+            }
+            if (isset($this->lazies[$id])) {
+                $proxyMethod = function (&$wrappedObject, $proxy, $method, $parameters, &$initializer) use ($constructor, $definition) {
+                    $wrappedObject = $constructor($definition);
+                    $initializer   = null; // turning off further lazy initialization
+                };
+                return $this->createProxy($this->lazies[$id], $proxyMethod);
+            } else {
+                return $constructor($definition);
+            }
         } finally {
-            $this->unmarkResolving($id);
+            $this->unmark($id);
         }
     }
 
-    public function trackReference(string $id)
+    protected function mark($id)
     {
-        $this->references[] = $id;
+        if (!empty($this->resolving[$id])) {
+            throw new CircularDependencyException([...array_keys($this->resolving), $id]);
+        }
+        $this->resolving[$id] = $id;
     }
 
-    protected function assertCircular($id)
+    protected function unmark($id)
     {
-        if (!empty($this->isResolving[$id])) {
-            throw new CircularDependencyException([...array_keys($this->isResolving), $id]);
-        }
-    }
-
-    public function markResolving(string ...$ids)
-    {
-        foreach ($ids as $id) {
-            $this->assertCircular($id);
-            $this->isResolving[$id] = true;
-        }
-    }
-
-    public function unmarkResolving(string ...$ids)
-    {
-        foreach ($ids as $id) {
-            unset($this->isResolving[$id]);
-        }
+        unset($this->resolving[$id]);
     }
 
     protected function getProxyFactory()
@@ -210,13 +155,76 @@ class Container implements ContainerInterface, ReferenceTrackerInterface, ProxyF
         return $this->proxyFactory;
     }
 
-    public function createProxy(string $className, callable $initializer)
+    protected function createProxy(string $className, callable $initializer)
     {
         return $this->getProxyFactory()->createProxy($className, Closure::fromCallable($initializer));
     }
 
-    public function getAutowire()
+    public function trackReference(string $id)
     {
-        return $this->autowire;
+        $this->references[$id] = true;
+    }
+
+    public static function load(string $filename): ?Container
+    {
+        $container = @include $filename;
+        return $container instanceof Container ? $container : null;
+    }
+
+    public function save(string $filename)
+    {
+        $this->autowire->setReferenceTracker($this);
+        $methods = [];
+        foreach ($this->definitions as $id => $definition) {
+            if ($id == $definition) {
+                $methods[$id] = $this->autowire->compileNew($definition);
+            } elseif (is_string($definition)) {
+                $this->trackReference($definition);
+                $methods[$id] = new CompiledClosure('static function (\\' . ContainerInterface::class . ' $container, array $args = []) { return $container->get(' . var_export($definition, true) . '); }');
+            } elseif (is_callable($definition)) {
+                $methods[$id] = $this->autowire->compileCall($definition);
+            } else {
+                throw new InvalidDefinitionException($id, var_export($definition, true));
+            }
+            if (isset($this->lazies[$id])) {
+                $code = 'static function (\\' . ContainerInterface::class . ' $container, array $args = []) {
+                $proxyMethod = function (&$wrappedObject, $proxy, $method, $parameters, &$initializer) use ($container) {
+                    $wrappedObject = (' . $methods[$id] . ')($container);
+                    $initializer   = null; // turning off further lazy initialization
+                };
+                return $container->createProxy(' . var_export($this->lazies[$id], true) . ', $proxyMethod);
+                }';
+                $methods[$id] = new CompiledClosure($code);
+            }
+        }
+
+        $level = 0;
+        while (!empty($this->references) && $level++ < $this->maxLevel) {
+            $ids = array_diff(array_keys($this->references), array_keys($methods));
+            $this->references = [];
+            foreach ($ids as $id) {
+                $methods[$id] = $this->autowire->compileNew($id);
+            }
+        }
+        $className = 'CompiledContainer' . uniqid();
+        $factories = $this->factories;
+        $lazies = $this->lazies;
+        $methodMap = [];
+        foreach (array_keys($methods) as $i => $id) {
+            $methodMap[$id] = 'make_' . $i;
+        }
+        ob_start();
+        include __DIR__ . '/CompiledContainer.php.tpl';
+        $code = "<?php\n" . ob_get_contents();
+        ob_end_clean();
+
+        $tmpfilename = tempnam(dirname($filename), 'container');
+        @chmod($tmpfilename, 0666);
+        file_put_contents($tmpfilename, $code);
+        @chmod($tmpfilename, 0666);
+        rename($tmpfilename, $filename);
+        @chmod($filename, 0666);
+
+        return array_keys($methods);
     }
 }

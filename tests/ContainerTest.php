@@ -158,6 +158,15 @@ class ContainerTest extends TestCase
 
         $result = $container->getAutowire()->call(['test', 'id']);
         $this->assertEquals($id, $result);
+
+        $result = $container->call(['test', 'id']);
+        $this->assertEquals($id, $result);
+
+        $test = $container->new(TestImplementation::class);
+        $id2 = $test->id();
+        $result = $container->call([$test, 'id']);
+        $this->assertEquals($id2, $result);
+        $this->assertNotEquals($id, $id2);
     }
 
     public function testCanCreateLazyProxyMappingWithCache()

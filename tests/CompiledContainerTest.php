@@ -121,7 +121,6 @@ class CompiledContainerTest extends TestCase
         TestImplementation::$counter = 0;
 
         $container->singleton(TestInterface::class, TestImplementation::class);
-        $container->singleton(Circular1::class);
         $container->singleton(TestImplementation::class, function () {
             return new TestImplementation();
         });
@@ -199,7 +198,6 @@ class CompiledContainerTest extends TestCase
         $container = Container::load($filename);
         unlink($filename);
 
-        $this->assertArrayHasKey(TestImplementation::class, $container::FACTORY_REFS);
+        $this->assertArrayHasKey(TestImplementation::class, $container::METHODS);
     }
-
 }
