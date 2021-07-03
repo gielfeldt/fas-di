@@ -28,11 +28,26 @@ $container = Container::load('/tmp/container.php');
 
 ## Adding dependencies
 
-Dependencies are resolved once, and then re-used subsequently.
-
 ```php
-// ->singleton(entryName, entryName | callback)
+// ->set(entryName, entryName | callback | null)
+// (singleton by default)
+$container->set(LoggerInterface::class, 'some_container_entry');
+
+// abstract factory
+$container->set(LoggerInterface::class, 'some_container_entry')->factory();
+
+// lazy
+$container->set(LoggerInterface::class, 'some_container_entry')->lazy(LoggerInterface::class);
+
+// lazy abstract factory
+$container->set(LoggerInterface::class, 'some_container_entry')
+    ->lazy(LoggerInterface::class)
+    ->factory();
+
+// shorthands
 $container->singleton(LoggerInterface::class, 'some_container_entry');
+$container->factory(LoggerInterface::class, 'some_container_entry');
+$container->lazy(LoggerInterface::class, 'some_container_entry');
 
  // If entry MyLogger::class does not exist in the container,
  // The class MyLogger::class will be instantiated.
@@ -49,19 +64,15 @@ $container->singleton(LoggerInterface::class, [MyLoggerFactory::class, 'create']
 
 Abstract factories. Will be resolved on every ->get()
 
-API is identical to ->singleton()
-
 ```php
 // ->factory(entryName, entryName | callback | null)
-$container->factory(MyLogger::class);
+$container->factory(MyLogger::class); // abstract factory shorthand
 
 $logger1 = $container->get(MyLogger::class); // will create new object
 $logger2 = $container->get(MyLogger::class); // will create new object
 ```
 
 Lazy. Will not be resolved before used. (virtual proxy)
-
-API is identical to ->singleton(), except you can omit 2nd parameter in order to turn any entry/class lazy
 
 ```php
 // ->lazy(entryName, entryName | callback | null)
@@ -99,23 +110,7 @@ $container->enableProxyCache("/tmp/proxies");
 // Container ready for use
 ```
 
-## Use cache if present
-
-If cache is generated during startup or build phase, it can be sufficient to just use
-the cache if it's present.
-
-```php
-$container = Container::load("/tmp/container.php");
-if (!$container) {
-    $container = new Container;
-    $container->singleton(LoggerInterface::class, MyLogger::class);
-}
-$container->useProxyCache("/tmp/proxies");
-
-// Container ready for use
-```
-
-## Write all cache
+## Generate compiled container
 
 This can be used in a compile script during startup of build phase.
 
