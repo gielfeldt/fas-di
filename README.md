@@ -77,6 +77,20 @@ Lazy. Will not be resolved before used. (virtual proxy)
 ```php
 // ->lazy(entryName, entryName | callback | null)
 $container->lazy(MyLogger::class); // Lazy shorthand
+
+// make anything lazy
+$container->set('myentry', [MyFactory::class, 'create'])
+    ->lazy(LoggerInterface::class);
+```
+
+Mix and match as you please:
+```php
+$container->factory(MyLogger::class)->lazy();
+```
+
+equivalent to:
+```php
+$container->lazy(MyLogger::class)->factory();
 ```
 
 ## Performance
