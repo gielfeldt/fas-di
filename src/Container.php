@@ -187,6 +187,7 @@ class Container implements ContainerInterface, ReferenceTrackerInterface
                 throw new InvalidDefinitionException($id, var_export($definition, true));
             }
             if (isset($this->lazies[$id])) {
+                $this->get($id); // Attempt to trigger proxy cache generation
                 $code = 'static function (\\' . ContainerInterface::class . ' $container, array $args = []) {
                 $proxyMethod = function (&$wrappedObject, $proxy, $method, $parameters, &$initializer) use ($container) {
                     $wrappedObject = (' . $methods[$id] . ')($container);
