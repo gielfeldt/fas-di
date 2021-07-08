@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Fas\DI;
 
 use Closure;
+use Exception;
 use Fas\Autowire\Autowire;
 use Fas\Autowire\CompiledClosure;
 use Fas\Autowire\Exception\CircularDependencyException;
@@ -167,11 +168,18 @@ class Container implements ContainerInterface, ReferenceTrackerInterface
 
     public static function load(string $filename): ?Container
     {
-        $container = @include $filename;
-        return $container instanceof Container ? $container : null;
+        $loader = @include $filename;
+        if (!$loader) {
+            return null;
+        }
+        [$file, $class] = $loader;
+        if (!class_exists($class, false)) {
+            require_once $file;
+        }
+        return new $class();
     }
 
-    public function save(string $filename)
+    public function save(string $filename, ?string $preload = null)
     {
         $this->autowire->setReferenceTracker($this);
         $methods = [];
@@ -207,7 +215,7 @@ class Container implements ContainerInterface, ReferenceTrackerInterface
                 $methods[$id] = $this->autowire->compileNew($id);
             }
         }
-        $className = 'CompiledContainer' . uniqid();
+        $className = 'container_' . uniqid();
         $factories = $this->factories;
         $lazies = $this->lazies;
         $methodMap = [];
@@ -219,13 +227,56 @@ class Container implements ContainerInterface, ReferenceTrackerInterface
         $code = "<?php\n" . ob_get_contents();
         ob_end_clean();
 
-        $tmpfilename = tempnam(dirname($filename), 'container');
+        $classFilename = dirname($filename) . '/' . $className . '.php';
+
+        $tmpfilename = tempnam(dirname($classFilename), 'fas-container');
         @chmod($tmpfilename, 0666);
         file_put_contents($tmpfilename, $code);
+        @chmod($tmpfilename, 0666);
+        rename($tmpfilename, $classFilename);
+        @chmod($classFilename, 0666);
+
+        $tmpfilename = tempnam(dirname($filename), 'fas-container');
+        @chmod($tmpfilename, 0666);
+        file_put_contents($tmpfilename, '<?php return ' . var_export([realpath($classFilename), $className], true) . ';');
         @chmod($tmpfilename, 0666);
         rename($tmpfilename, $filename);
         @chmod($filename, 0666);
 
+        if ($preload) {
+            $this->savePreload($preload, $classFilename);
+        }
         return array_keys($methods);
+    }
+
+    private function savePreload(string $filename, string $classFilename)
+    {
+        foreach (get_declared_classes() as $className) {
+            if (strpos($className, 'ComposerAutoloader') === 0) {
+                $classLoader = $className::getLoader();
+                break;
+            }
+        }
+        if (empty($classLoader)) {
+            throw new Exception("Cannot locate class loader");
+        }
+
+        $files = [];
+        $files[] = $classLoader->findFile(\Psr\Container\ContainerInterface::class);
+        $files[] = $classLoader->findFile(\Fas\DI\Container::class);
+        $files[] = $classFilename;
+
+        $preload = "<?php\n";
+        foreach ($files as $file) {
+            $preload .= 'opcache_compile_file(' . var_export(realpath($file), true) . ");\n";
+        }
+
+        $filename = dirname($filename) . '/preload.' . basename($filename);
+        $tempfile = tempnam(dirname($filename), 'fas-container');
+        @chmod($tempfile, 0666);
+        file_put_contents($tempfile, $preload);
+        @chmod($tempfile, 0666);
+        rename($tempfile, $filename);
+        @chmod($filename, 0666);
     }
 }

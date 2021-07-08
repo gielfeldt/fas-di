@@ -1,9 +1,7 @@
 
 declare(strict_types=1);
 
-namespace Fas\DI;
-
-class <?php print $className; ?> extends Container
+class <?php print $className; ?> extends \Fas\DI\Container
 
 {
     protected array $factories = <?php var_export($factories); ?>;
@@ -31,5 +29,3 @@ class <?php print $className; ?> extends Container
         return $method ? $this->$method() : parent::make($id);
     }
 }
-
-return new <?php print $className; ?>;
