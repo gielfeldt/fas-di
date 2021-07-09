@@ -11,6 +11,7 @@ use Fas\Autowire\CompiledClosure;
 use Fas\Autowire\Exception\CircularDependencyException;
 use Fas\Autowire\Exception\InvalidDefinitionException;
 use Fas\Autowire\ReferenceTrackerInterface;
+use Fas\Exportable\Exporter;
 use Psr\Container\ContainerInterface;
 use ProxyManager;
 
@@ -215,7 +216,8 @@ class Container implements ContainerInterface, ReferenceTrackerInterface
                 $methods[$id] = $this->autowire->compileNew($id);
             }
         }
-        $className = 'container_' . uniqid();
+        $id = hash('sha256', (new Exporter())->export($methods));
+        $className = 'container_' . $id;
         $factories = $this->factories;
         $lazies = $this->lazies;
         $methodMap = [];
@@ -264,14 +266,21 @@ class Container implements ContainerInterface, ReferenceTrackerInterface
         $files = [];
         $files[] = $classLoader->findFile(\Psr\Container\ContainerInterface::class);
         $files[] = $classLoader->findFile(\Fas\DI\Container::class);
+        $files[] = $classLoader->findFile(ProxyManager\Configuration::class);
+        $files[] = $classLoader->findFile(ProxyManager\FileLocator\FileLocator::class);
+        $files[] = $classLoader->findFile(ProxyManager\GeneratorStrategy\FileWriterGeneratorStrategy::class);
+        $files[] = $classLoader->findFile(ProxyManager\Autoloader\Autoloader::class);
+        $files[] = $classLoader->findFile(ProxyManager\Inflector\ClassNameInflector::class);
+        $files[] = $classLoader->findFile(ProxyManager\ProxyGenerator\LazyLoadingValueHolderGenerator::class);
+        $files[] = $classLoader->findFile(ProxyManager\Factory\LazyLoadingValueHolderFactory::class);
+
         $files[] = $classFilename;
 
         $preload = "<?php\n";
         foreach ($files as $file) {
-            $preload .= 'opcache_compile_file(' . var_export(realpath($file), true) . ");\n";
+            $preload .= 'require_once(' . var_export(realpath($file), true) . ");\n";
         }
 
-        $filename = dirname($filename) . '/preload.' . basename($filename);
         $tempfile = tempnam(dirname($filename), 'fas-container');
         @chmod($tempfile, 0666);
         file_put_contents($tempfile, $preload);
