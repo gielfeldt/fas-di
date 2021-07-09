@@ -22,7 +22,7 @@
         "php": ">=7.4.0",
         "psr/container": "^1.0 || ^2.0",
         "psr/log": "^1.1",
-        "fas/autowire": "^0.2",
+        "fas/autowire": "dev-main",
         "opis/closure": "^3.6",
         "ocramius/proxy-manager": "^2.11",
         "fas/exportable": "^0.2"
