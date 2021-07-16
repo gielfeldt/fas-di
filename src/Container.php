@@ -115,7 +115,7 @@ class Container implements ContainerInterface, ReferenceTrackerInterface
                 $constructor = function ($definition) {
                     return $this->get($definition);
                 };
-            } elseif (is_callable($definition)) {
+            } elseif ($this->is_callable($definition)) {
                 $constructor = function ($definition) {
                     return $this->autowire->call($definition);
                 };
@@ -162,6 +162,17 @@ class Container implements ContainerInterface, ReferenceTrackerInterface
         return $this->getProxyFactory()->createProxy($className, Closure::fromCallable($initializer));
     }
 
+    protected function is_callable($definition)
+    {
+        if (is_callable($definition)) {
+            return true;
+        }
+        if (is_array($definition) && $this->autowire->canAutowire($definition[0])) {
+            return true;
+        }
+        return false;
+    }
+
     public function trackReference(string $id)
     {
         $this->references[$id] = true;
@@ -190,7 +201,7 @@ class Container implements ContainerInterface, ReferenceTrackerInterface
             } elseif (is_string($definition)) {
                 $this->trackReference($definition);
                 $methods[$id] = new CompiledClosure('static function (\\' . ContainerInterface::class . ' $container, array $args = []) { return $container->get(' . var_export($definition, true) . '); }');
-            } elseif (is_callable($definition)) {
+            } elseif ($this->is_callable($definition)) {
                 $methods[$id] = $this->autowire->compileCall($definition);
             } else {
                 throw new InvalidDefinitionException($id, var_export($definition, true));

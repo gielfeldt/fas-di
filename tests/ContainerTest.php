@@ -197,4 +197,20 @@ class ContainerTest extends TestCase
         $this->assertTrue($container->has(ContainerInterface::class));
         $this->assertEquals($container, $container->get(ContainerInterface::class));
     }
+
+    public function testCanUseStaticClassMethodsAsFactory()
+    {
+        $container = new Container();
+        $container->set('test', [TestImplementation::class, 'staticfunction']);
+        $result = $container->get('test');
+        $this->assertEquals('ABC', $result);
+    }
+
+    public function testCanUseNonStaticClassMethodsAsFactory()
+    {
+        $container = new Container();
+        $container->set('test', [TestImplementation::class, 'implementation']);
+        $result = $container->get('test');
+        $this->assertEquals('ABC', $result);
+    }
 }
