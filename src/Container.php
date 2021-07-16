@@ -222,6 +222,9 @@ class Container implements ContainerInterface, ReferenceTrackerInterface
         $level = 0;
         while (!empty($this->references) && $level++ < $this->maxLevel) {
             $ids = array_diff(array_keys($this->references), array_keys($methods));
+            $ids = array_filter($ids, function ($id) {
+                return $id !== ContainerInterface::class;
+            });
             $this->references = [];
             foreach ($ids as $id) {
                 $methods[$id] = $this->autowire->compileNew($id);

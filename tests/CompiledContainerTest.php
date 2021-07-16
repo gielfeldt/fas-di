@@ -200,4 +200,19 @@ class CompiledContainerTest extends TestCase
 
         $this->assertArrayHasKey(TestImplementation::class, $container::METHODS);
     }
+
+    public function testCanCompileContainerInterfaceReference()
+    {
+        $container = new Container();
+        $container->singleton('test', ContainerDep::class);
+        $container->singleton('name', static function () { return 'myname'; });
+
+        $filename = tempnam(sys_get_temp_dir(), 'fas-di-test');
+        $container->save($filename);
+        $container = Container::load($filename);
+        unlink($filename);
+
+        $this->assertArrayHasKey('test', $container::METHODS);
+        $this->assertEquals('MYNAME', $container->get('test')->result());
+    }
 }
