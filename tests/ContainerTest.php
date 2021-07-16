@@ -7,6 +7,7 @@ use Fas\Autowire\Exception\InvalidDefinitionException;
 use Fas\DI\Container;
 use Fas\DI\Tests\TestImplementation;
 use PHPUnit\Framework\TestCase;
+use Psr\Container\ContainerInterface;
 
 class ContainerTest extends TestCase
 {
@@ -188,5 +189,12 @@ class ContainerTest extends TestCase
 
         // Test not working on github actions...
         $this->assertTrue(true);
+    }
+
+    public function testContainerIsAvailableInFactory()
+    {
+        $container = new Container();
+        $this->assertTrue($container->has(ContainerInterface::class));
+        $this->assertEquals($container, $container->get(ContainerInterface::class));
     }
 }

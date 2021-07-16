@@ -35,7 +35,7 @@ class Container implements ContainerInterface, ReferenceTrackerInterface
 
     public function has(string $id): bool
     {
-        return isset($this->definitions[$id]) || $this->autowire->canAutowire($id);
+        return isset($this->definitions[$id]) || isset($this->resolved[$id]) || $this->autowire->canAutowire($id);
     }
 
     public function get(string $id)
